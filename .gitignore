@@ -1,0 +1,31 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# byproduct by manim
+media/
+MNIST/
+
+# Non-git projects
+test*/
+skipgit/
+CLAUDE.md
+.claude
+
+# manim specific bug
+a.out
+
+# uv settings
+.python-version
+uv.lock
+
+# media files
+*.mp4
+*.gif
