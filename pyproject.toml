@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = "==3.10.18"
 dependencies = [
     "manimgl",
+    "matplotlib>=3.10.8",
     "pywavefront>=1.3.3",
     "raenimgl",
     "trimesh>=4.11.5",
