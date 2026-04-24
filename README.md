@@ -21,3 +21,11 @@ $ uv init_project.py --name my_manim
 1. 클래스가 하나의 영상입니다
 2. `manim main.py <class_name>` 실행 시 <class_name>.construct()를 실행합니다
 3. 생성된 영상은 `videos/`에 저장됩니다
+
+## turboquant1
+Turboquant1: What is quantization?
+[[YouTube link]](https://youtu.be/WH6sNfPzEDk) <br />
+```bash
+$ cd src/turboquant1
+$ uv run manimgl main.py
+```
