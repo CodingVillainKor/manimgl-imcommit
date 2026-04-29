@@ -29,3 +29,11 @@ Turboquant1: What is quantization?
 $ cd src/turboquant1
 $ uv run manimgl main.py
 ```
+
+## turboquant2
+Turboquant2: Hypersphere + Randomized hadamard transform
+[[YouTube link]](https://youtu.be/0J6tcbn9GzQ) <br />
+```bash
+$ cd src/turboquant2
+$ uv run manimgl main.py
+```
