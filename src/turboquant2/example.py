@@ -220,3 +220,115 @@ fig.suptitle('step 7.  Aligned outliers -> large <q,k> -> Stage-1 shrinks it -> 
 plt.tight_layout()
 plt.show()
 
+
+# ---------- 8. QJL on residual: sketch alone looks random, but mean(sketch * q_proj) ----------
+# 잔차 r_t (projected space) 와 query 측 (m·q) 에 같은 Gaussian projection G 를 걸어서:
+#   sketch_i = sign(G_i^T · r_t)         <- 키 측에 1 bit 씩 저장 (key 만으로 결정)
+#   q_proj_i = G_i^T · (m · q)            <- query 시점에 즉석 계산 (full-precision)
+# 한 항의 곱  sketch_i * q_proj_i  은 (X = G_i·m·q,  Y = G_i·r_t) 가 joint Gaussian 이라
+#   E[X · sign(Y)] = sqrt(2/pi) * <m·q, r_t> / ||r_t||
+# 이 평균값을 ||r_t|| · ||k|| · sqrt(pi/2) 배 하면 정확히 ||k||·<m·q, r_t> = -bias.
+# 핵심:
+#   (1) sketch 자체는 그냥 ±1 noise 처럼 보임 (q 와 무관, key 만으로 결정).
+#   (2) HARD 는 <m·q, r_t> 가 큼  -> mean(sketch * q_proj) 가 0 에서 멀어짐.
+#   (3) EASY 는 <m·q, r_t> 가 작음 -> 같은 평균이 0 근처에서 진동.
+m_proj = 4096
+G      = rng.standard_normal((m_proj, D))
+
+sketch     = np.sign(G @ r_t)                        # [m_proj]   ±1
+mq_hard    = m @ q_hard
+mq_easy    = m @ q_easy
+qproj_hard = G @ mq_hard                             # [m_proj]   continuous
+qproj_easy = G @ mq_easy
+prod_hard  = sketch * qproj_hard
+prod_easy  = sketch * qproj_easy
+
+sqrt_2_pi      = np.sqrt(2 / np.pi)
+sqrt_pi_over_2 = np.sqrt(np.pi / 2)
+
+# E[ mean(sketch * q_proj) ]  =  sqrt(2/pi) * <m·q, r_t> / ||r_t||
+target_mean_hard = (mq_hard @ r_t) / norm_r_t * sqrt_2_pi
+target_mean_easy = (mq_easy @ r_t) / norm_r_t * sqrt_2_pi
+
+# 최종 QJL 추정 (||r||·||k||·sqrt(pi/2)·mean)  ≈  ||k||·<m·q, r>  (= -bias)
+est_hard = norm_r_t * k_t_norm * sqrt_pi_over_2 * prod_hard.mean()
+est_easy = norm_r_t * k_t_norm * sqrt_pi_over_2 * prod_easy.mean()
+
+# step 7 의 참 residual ip
+res_ip_hard = (mq_hard @ r_t) * k_t_norm
+res_ip_easy = (mq_easy @ r_t) * k_t_norm
+
+print('=' * 78)
+print(f'QJL recovery of residual ip   (m_proj={m_proj},  G ~ N(0, I_D))')
+print('=' * 78)
+print(f'                            mean(sketch*q_proj)    target       '
+      f'QJL est       true res ip')
+print(f'  HARD                      {prod_hard.mean():+9.4f}        '
+      f'{target_mean_hard:+9.4f}    {est_hard:+8.2f}      {res_ip_hard:+8.2f}')
+print(f'  EASY                      {prod_easy.mean():+9.4f}        '
+      f'{target_mean_easy:+9.4f}    {est_easy:+8.2f}      {res_ip_easy:+8.2f}')
+print('=' * 78)
+
+# Visualization
+fig = plt.figure(figsize=(14, 8.5))
+gs  = fig.add_gridspec(4, 1, height_ratios=[0.4, 0.4, 0.4, 2.4], hspace=0.7)
+
+n_show = min(m_proj, 256)                            # 처음 256 개만 시각화 (가독성)
+qmax   = max(abs(qproj_hard[:n_show]).max(), abs(qproj_easy[:n_show]).max())
+
+# Strip 1: sketch
+ax = fig.add_subplot(gs[0])
+ax.imshow(sketch[:n_show].reshape(1, -1), aspect='auto', cmap='RdBu_r', vmin=-1, vmax=1)
+ax.set_yticks([]); ax.set_xticks([])
+ax.set_title(f'sketch = sign(G @ r_t)   (length {m_proj}, showing first {n_show})  '
+             '... pure +/-1 noise, depends only on key',
+             fontsize=10, loc='left')
+
+# Strip 2: q_projected HARD
+ax = fig.add_subplot(gs[1])
+ax.imshow(qproj_hard[:n_show].reshape(1, -1), aspect='auto',
+          cmap='RdBu_r', vmin=-qmax, vmax=qmax)
+ax.set_yticks([]); ax.set_xticks([])
+ax.set_title('q_projected HARD = G @ (m * q_hard)   '
+             '... continuous, also looks Gaussian',
+             fontsize=10, loc='left')
+
+# Strip 3: q_projected EASY
+ax = fig.add_subplot(gs[2])
+ax.imshow(qproj_easy[:n_show].reshape(1, -1), aspect='auto',
+          cmap='RdBu_r', vmin=-qmax, vmax=qmax)
+ax.set_yticks([])
+ax.set_title('q_projected EASY = G @ (m * q_easy)   '
+             '... also Gaussian, no visible difference vs HARD by eye',
+             fontsize=10, loc='left')
+ax.set_xlabel('projection index')
+
+# Bottom: running mean (the pattern that emerges from the elementwise product)
+ax = fig.add_subplot(gs[3])
+xs           = np.arange(1, m_proj + 1)
+running_hard = np.cumsum(prod_hard) / xs
+running_easy = np.cumsum(prod_easy) / xs
+ax.plot(xs, running_hard, color='C3', lw=1.6,
+        label=f'HARD  running mean(sketch * q_proj)   '
+              f'->  target {target_mean_hard:+.3f}   '
+              f'(QJL est = {est_hard:+.2f}, true res ip = {res_ip_hard:+.2f})')
+ax.plot(xs, running_easy, color='C0', lw=1.6,
+        label=f'EASY  running mean(sketch * q_proj)   '
+              f'->  target {target_mean_easy:+.3f}   '
+              f'(QJL est = {est_easy:+.2f}, true res ip = {res_ip_easy:+.2f})')
+ax.axhline(target_mean_hard, color='C3', ls='--', lw=1, alpha=0.6)
+ax.axhline(target_mean_easy, color='C0', ls='--', lw=1, alpha=0.6)
+ax.axhline(0, color='black', lw=0.6)
+ax.set_xlabel('# projections used  (m_proj cumulative)')
+ax.set_ylabel('mean(sketch * q_proj)')
+ax.set_title('mean(sketch * q_proj)  ->  sqrt(2/pi) * <m.q, r_t> / ||r_t||     '
+             '(HARD large, EASY ~ 0)',
+             fontsize=11)
+ax.legend(loc='best', fontsize=9)
+ax.grid(alpha=0.3)
+
+fig.suptitle('step 8.  sketch alone is +/-1 noise; '
+             'elementwise product with q_proj reveals correlation -> recovers residual ip',
+             fontsize=12)
+plt.show()
+
