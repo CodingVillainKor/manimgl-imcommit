@@ -1,5 +1,5 @@
 """
-TurboQuant - k에 RHT 적용 + QJL(1-bit) 양자화 과정 시각화
+TurboQuant (Zandieh et al. 2025, arXiv:2504.19874) - 2-stage 양자화 시각화
 
 핵심:
   - k in R^D, ||k||=1 이면 k의 각 좌표는 (1 - x^2)^((D-3)/2) ~ shifted/scaled Beta((D-1)/2,(D-1)/2)
@@ -7,12 +7,19 @@ TurboQuant - k에 RHT 적용 + QJL(1-bit) 양자화 과정 시각화
   - m 은 직교행렬:  m^T m = I
   - outlier 가 있는 k 를 L2 정규화 후 m 을 곱하면 outlier 에너지가 모든 좌표로 퍼져 Beta 분포를 따름
 
-QJL (Quantized Johnson-Lindenstrauss, Zandieh et al. 2024):
-  - 키는 1-bit 부호 양자화:  c_k = sign(m @ k)
-  - 쿼리는 풀-프리시전 투영:   y_q = m @ q
-  - 내적 추정:   <q, k> ≈ ||k|| * sqrt(pi/(2D)) * <y_q, c_k>
-  - 근거: (a, b) ~ N(0, Σ) 이면 E[a sign(b)] = sqrt(2/π) σ_a ρ
-          RHT 출력 좌표가 Beta 분포(≈Gaussian)이므로 위 관계가 근사적으로 성립
+TurboQuant_prod (unbiased inner-product variant) — b bits/coord:
+  - Stage 1 (b-1 bits): y = m @ k_norm 의 각 좌표에 Beta 분포 최적 Lloyd-Max 스칼라 양자화
+                        → 정수 코드 Q_mse(y), 디코드 dequantized_y
+  - Stage 2 (1  bit ): 잔차 r = y - dequantized_y 에 QJL 부호 비트
+                        → sign(r) 1bit/coord  +  스칼라 ||r||_2
+  - 키 1개 저장량:  D 개의 b-bit 코드 + 2 floats (||k||, ||r||)
+
+  - 내적 추정 (m 직교 → m m^T = I 이용해 같은 m 으로 QJL 적용):
+      <q, k_norm> ≈ <m@q, dequantized_y>  +  sqrt(pi/(2D)) * ||r|| * <m@q, sign(r)>
+      <q, k>     = ||k|| * <q, k_norm>
+
+  - b=1 (특수 케이스) 이면 dequantized_y = 0, ||r|| = 1, sign(r) = sign(y) 로
+    Zandieh et al. 2024 의 순수 QJL 과 동치
 """
 
 import numpy as np
@@ -121,112 +128,95 @@ plt.tight_layout()
 plt.show()
 
 
-# ---------- 7. QJL: 1-bit sign quantization of  m @ k_norm ----------
-# 저장: 부호 비트  c_k = sign(m @ k_norm)  (1 bit/coord)  +  스칼라  ||k||
-c_k = np.sign(y).astype(np.float64)            # shape [B, L, D]  in {-1, +1}
-k_norms = np.linalg.norm(k, axis=-1)           # [B, L]   원본 k 노름 (스케일 복원용)
+# ---------- 7. High-bias scenario: build (q, k) where outliers align ----------
+# 같은 좌표 · 같은 부호의 outlier 가 있는 (q, k) → <q, k> 가 매우 큼
+# → Stage-1 quant 가 그 진폭을 centroid 쪽으로 깎음 (systematic shrink, biased)
+# → 잘려나간 양 = ||k|| · <m·q, r>  (= 정확히 bias 의 크기)
+# 정렬 안된 (EASY) 페어는 <q, k> 자체가 작아 잘려나갈 것도 거의 없음.
+def lloyd_max_1d(samples, n_levels, n_iter=200, tol=1e-9):
+    s = np.asarray(samples).flatten()
+    if n_levels == 1:
+        return np.array([s.mean()]), np.array([])
+    qs = (np.arange(n_levels) + 0.5) / n_levels
+    centroids = np.quantile(s, qs)
+    for _ in range(n_iter):
+        bnds = (centroids[:-1] + centroids[1:]) / 2
+        idx = np.searchsorted(bnds, s)
+        new = np.array([s[idx == i].mean() if np.any(idx == i) else centroids[i]
+                        for i in range(n_levels)])
+        if np.max(np.abs(new - centroids)) < tol:
+            centroids = new; break
+        centroids = new
+    return centroids, (centroids[:-1] + centroids[1:]) / 2
 
-fig, axes = plt.subplots(2, 1, figsize=(12, 7), sharex=True)
-vmax_y = np.abs(y).max()
-im0 = axes[0].imshow(y[0], aspect='auto', cmap='RdBu_r', vmin=-vmax_y, vmax=vmax_y)
-axes[0].set_title('continuous projection   m @ k_norm')
-axes[0].set_ylabel('L')
-plt.colorbar(im0, ax=axes[0])
+# Stage-1: 2-bit Lloyd-Max (b_mse = 2 → 4 centroids)
+n_levels        = 4
+centroids, bnds = lloyd_max_1d(y.flatten(), n_levels)
 
-im1 = axes[1].imshow(c_k[0], aspect='auto', cmap='RdBu_r', vmin=-1, vmax=1)
-axes[1].set_title('step 7.  QJL 1-bit code   sign(m @ k_norm)')
-axes[1].set_xlabel('D'); axes[1].set_ylabel('L')
-plt.colorbar(im1, ax=axes[1])
+# Target key: 첫 번째 row.  outlier 가 박힌 두 좌표를 찾아둔다.
+k_t         = k[0, 0]
+k_t_norm    = np.linalg.norm(k_t)
+outlier_idx = np.argsort(np.abs(k_t))[-2:]
+outlier_sgn = np.sign(k_t[outlier_idx])
+
+# Stage-1 dequantize on y[0, 0]  -> residual r_t (projected space)
+y_t      = y[0, 0]
+codes_t  = np.searchsorted(bnds, y_t)
+y_dq_t   = centroids[codes_t]
+r_t      = y_t - y_dq_t
+norm_r_t = np.linalg.norm(r_t)
+
+# 두 query: HARD (정렬), EASY (다른 좌표에 outlier)
+rng       = np.random.default_rng(7)
+q_hard    = rng.standard_normal(D)
+q_hard[outlier_idx] = outlier_sgn * rng.uniform(15, 20, size=2)     # 같은 좌표·같은 부호
+
+other_idx = np.setdiff1d(np.arange(D), outlier_idx)
+easy_idx  = rng.choice(other_idx, size=2, replace=False)
+q_easy    = rng.standard_normal(D)
+q_easy[easy_idx] = rng.choice([-1, 1], size=2) * rng.uniform(15, 20, size=2)
+
+scenarios = [('HARD  (q,k outliers aligned)', q_hard),
+             ('EASY  (outliers on different coords)', q_easy)]
+
+# 분해:  <q, k> = ||k|| · <m·q, dequantized_y>     (Stage-1, biased)
+#                + ||k|| · <m·q, r_t>               (= -bias, missing piece)
+print('=' * 78)
+print(f'Stage-1 (b_mse=2 bit, {n_levels} levels)  decomposition for target k[0,0]')
+print(f'  ||k_t|| = {k_t_norm:.2f},  ||r_t|| = {norm_r_t:.4f}  '
+      f'(residual norm: scenario-independent)')
+print('=' * 78)
+print(f'                                            true        Stage-1     '
+      f'residual ip   |bias|')
+results = []
+for lab, q in scenarios:
+    mq       = m @ q
+    true_ip  = q @ k_t
+    s1_ip    = (mq @ y_dq_t) * k_t_norm
+    res_ip   = (mq @ r_t)    * k_t_norm                  # = true - stage1 = -bias
+    results.append((lab, mq, true_ip, s1_ip, res_ip))
+    print(f'  {lab:42s}  {true_ip:+9.2f}   {s1_ip:+9.2f}   '
+          f'{res_ip:+9.2f}   {abs(s1_ip-true_ip):7.2f}')
+print('=' * 78)
+
+fig, axes = plt.subplots(1, 2, figsize=(13, 4.6))
+for ax, (lab, mq, true_ip, s1_ip, res_ip) in zip(axes, results):
+    bias = s1_ip - true_ip
+    bars = ['true  <q, k>',
+            'Stage-1 est\n||k||*<m.q, dequant>',
+            'residual ip\n||k||*<m.q, r>']
+    vals = [true_ip, s1_ip, res_ip]
+    cols = ['gray', 'C1', 'C2']
+    ax.bar(bars, vals, color=cols, edgecolor='black')
+    ax.axhline(0, color='black', lw=0.6)
+    ax.set_title(f'{lab}\nbias = Stage1 - true = {bias:+.2f}'
+                 f'   |   residual = {res_ip:+.2f}')
+    ax.set_ylabel('inner product')
+    ax.tick_params(axis='x', labelsize=9)
+
+fig.suptitle('step 7.  Aligned outliers -> large <q,k> -> Stage-1 shrinks it -> '
+             'residual ip ||k||*<m.q, r> carries the missing piece (= -bias)',
+             fontsize=11)
 plt.tight_layout()
 plt.show()
 
-
-# ---------- 8. QJL 내적 추정:  <q, k> ≈ ||k|| sqrt(pi/(2D)) <m q, sign(m k_norm)> ----------
-# 모든 (i, j) 쌍에 대해 true vs estimated inner product 비교
-# query 는 풀-프리시전 투영(원본 스케일), key 는 1-bit 부호코드 + 노름 스칼라만 저장
-K   = k[0]                                       # [L, D]  원본 (outlier 포함)
-mQ  = np.einsum('ij,lj->li', m, K)               # [L, D]  쿼리측: 원본 q 의 풀-프리시전 투영
-cK  = c_k[0]                                     # [L, D]  키측: sign(m @ k_norm) 1-bit
-nrm = k_norms[0]                                 # [L]     키 노름 ||k|| (스케일 복원)
-
-scale = np.sqrt(np.pi / (2.0 * D))
-inner_qjl  = scale * nrm[None, :] * (mQ @ cK.T)         # [L_q, L_k]   QJL 추정
-inner_true = K @ K.T                                     # [L_q, L_k]   참값 <q, k>
-
-err_abs = np.abs(inner_qjl - inner_true)
-rel_err = np.linalg.norm(inner_qjl - inner_true) / np.linalg.norm(inner_true)
-
-fig, axes = plt.subplots(1, 3, figsize=(15, 4))
-vmax_ip = np.abs(inner_true).max()
-im0 = axes[0].imshow(inner_true, cmap='RdBu_r', vmin=-vmax_ip, vmax=vmax_ip)
-axes[0].set_title('true   <k_i, k_j>')
-plt.colorbar(im0, ax=axes[0])
-
-im1 = axes[1].imshow(inner_qjl, cmap='RdBu_r', vmin=-vmax_ip, vmax=vmax_ip)
-axes[1].set_title('step 8.  QJL estimate')
-plt.colorbar(im1, ax=axes[1])
-
-axes[2].scatter(inner_true.flatten(), inner_qjl.flatten(),
-                s=12, alpha=0.6, edgecolor='k', linewidth=0.3)
-lo, hi = inner_true.min(), inner_true.max()
-axes[2].plot([lo, hi], [lo, hi], 'r--', lw=1.5, label='y = x')
-axes[2].set_xlabel('true  <k_i, k_j>')
-axes[2].set_ylabel('QJL  estimate')
-axes[2].set_title(f'rel. err  = {rel_err:.3f}')
-axes[2].legend(); axes[2].grid(alpha=0.3)
-plt.tight_layout()
-plt.show()
-
-
-# ---------- 9. QJL 분산 vs 투영차원 m_proj  (m_proj 키울수록 추정 분산 감소) ----------
-# JL 차원을 D 보다 크게 잡으려면 가우시안 행렬 S in R^{m_proj x D} 사용
-# (RHT 는 정확히 D x D 직교행렬이라 차원 변경 불가)
-m_list = [64, 128, 256, 512, 1024, 2048]
-n_trials = 20
-
-# 단위벡터 두 개의 참 내적값 = cos(theta)
-Kn_mat = k_norm[0]                              # [L, D]  단위벡터
-true_cos_pairs = (Kn_mat @ Kn_mat.T)            # [L, L]
-mask = ~np.eye(L, dtype=bool)
-true_vals = true_cos_pairs[mask]                # 모든 비대각 쌍
-
-mse_curve = []
-for m_proj in m_list:
-    errs = []
-    for t in range(n_trials):
-        # rows ~ N(0, I_D / m_proj)  =>  ||S k||^2 ≈ ||k||^2  (JL 평균 보존)
-        S = np.random.randn(m_proj, D) / np.sqrt(m_proj)
-        Sk = Kn_mat @ S.T                        # [L, m_proj]
-        cSk = np.sign(Sk)                        # 1-bit code
-        # 추정자:  <q,k> ≈ sqrt(pi/(2 m_proj)) * ||k|| * <S q, sign(S k)>
-        # 단위벡터이므로 ||k||=1, 같은 S 를 쿼리에도 사용
-        est = np.sqrt(np.pi / (2.0 * m_proj)) * (Sk @ cSk.T)
-        errs.append((est[mask] - true_vals) ** 2)
-    mse_curve.append(np.mean(errs))
-
-fig, ax = plt.subplots(figsize=(7, 4.5))
-ax.loglog(m_list, mse_curve, 'o-', label='empirical MSE  (avg over pairs/trials)')
-# 이론: Var ~ C / m_proj  (1/m 감소)
-c_fit = mse_curve[0] * m_list[0]
-ax.loglog(m_list, [c_fit / mp for mp in m_list], 'r--',
-          label=r'$\propto 1/m_{proj}$  reference')
-ax.set_xlabel(r'projection dim  $m_{proj}$')
-ax.set_ylabel(r'MSE of  $\widehat{\langle q,k \rangle}$')
-ax.set_title('step 9.  QJL variance decreases as 1 / m_proj')
-ax.grid(True, which='both', alpha=0.3)
-ax.legend()
-plt.tight_layout()
-plt.show()
-
-
-# ---------- 10. 콘솔 요약 ----------
-print('='*60)
-print('QJL property check')
-print('='*60)
-print(f'D            = {D}')
-print(f'#pairs       = {L*L}')
-print(f'rel. L2 err  = {rel_err:.4f}    (RHT projection, 1-bit keys)')
-print(f'mean |err|   = {err_abs.mean():.4f}')
-print(f'max  |err|   = {err_abs.max():.4f}')
-print(f'storage/key  : {D} bits + 1 float (||k||)   vs  {D} floats original')
-print('='*60)
