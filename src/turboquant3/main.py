@@ -871,7 +871,6 @@ class QJL(InteractiveScene, Scene2D):
         bit_result.add(signs[-1].copy())
         self.playw(Transform(signs, bit_result))
 
-        self.embed()
         ## 이렇게 추가로 1bit를 더 저장해두는게 QJL의 핵심입니다
         self.play(
             signs.animate.next_to(eq, RIGHT, buff=0.75),
@@ -883,8 +882,296 @@ class QJL(InteractiveScene, Scene2D):
             FadeOut(residual),
         )
         rect_orig = SurroundingRectangle(key, color=GREEN, buff=0.25)
-        text_orig = Text("Original", font_size=24).set_color(GREEN).next_to(rect_orig, DOWN, buff=0.1)
-        rect_quant = SurroundingRectangle(VGroup(key_quantized, signs), color=RED, buff=0.25)
-        text_quant = Text("Quantized, QJL", font_size=24).set_color(RED).next_to(rect_quant, DOWN, buff=0.1)
+        text_orig = (
+            Text("Original", font_size=24)
+            .set_color(GREEN)
+            .next_to(rect_orig, DOWN, buff=0.1)
+        )
+        rect_quant = SurroundingRectangle(
+            VGroup(key_quantized, signs), color=RED, buff=0.25
+        )
+        text_quant = (
+            Text("Quantized, QJL", font_size=24)
+            .set_color(RED)
+            .next_to(rect_quant, DOWN, buff=0.1)
+        )
         self.play(FadeIn(rect_orig), FadeIn(rect_quant), run_time=0.5)
         self.playw(FadeIn(text_orig), FadeIn(text_quant))
+
+
+class attn_qjl(InteractiveScene, Scene2D):
+    def construct(self):
+
+        ## attention 계산할 때는요
+        vector_scale = 0.3
+        key_array = np.random.randn(7, 1)
+        key = Matrix(key_array).scale(vector_scale).set_color(GREY_B)
+        key[3].become(Text("...", font_size=24).set_color(GREY_C).move_to(key[3]))
+        num_ticks = 16
+        key_quantized_arr = np.array(
+            [
+                np.argmin(np.abs(np.linspace(-2, 2, num_ticks) - key_array[i, 0]))
+                * (4 / (num_ticks - 1))
+                - 2
+                for i in range(7)
+            ]
+        )
+        key_quantized = (
+            Matrix(key_quantized_arr[:, None]).scale(vector_scale).set_color(GREY_B)
+        )
+        key_quantized[3].become(
+            Text("...", font_size=24).set_color(GREY_C).move_to(key_quantized[3])
+        )
+        residual_arr = key_array[:, 0] - key_quantized_arr
+        bit_arr = np.array([1 if x >= 0 else -1 for x in residual_arr])
+        bits = VGroup(
+            *[
+                (
+                    Text(str(bit_arr[i]), font_size=12).move_to(key_quantized[i])
+                    if i != 3
+                    else Text("...", font_size=24)
+                    .set_color(GREY_C)
+                    .move_to(key_quantized[3])
+                )
+                for i in range(7)
+            ],
+            *key_quantized[-2:].copy(),
+        )
+        vectors = (
+            VGroup(key, key_quantized, bits)
+            .arrange(RIGHT, buff=0.5)
+            .to_edge(UR, buff=1)
+        )
+        rect_orig = SurroundingRectangle(key, color=GREEN, buff=0.15)
+        text_orig = (
+            Text("Original", font_size=18)
+            .set_color(GREEN)
+            .next_to(rect_orig, DOWN, buff=0.1)
+        )
+        rect_quant = SurroundingRectangle(
+            VGroup(key_quantized, bits), color=RED, buff=0.15
+        )
+        text_quant = (
+            Text("Quantized, QJL", font_size=18)
+            .set_color(RED)
+            .next_to(rect_quant, DOWN, buff=0.1)
+        )
+        self.playw(
+            FadeIn(vectors),
+            FadeIn(rect_orig),
+            FadeIn(rect_quant),
+            FadeIn(text_orig),
+            FadeIn(text_quant),
+            run_time=0.5,
+        )
+
+        ## 일단 query랑 quantize했던 원래 key랑 먼저 내적을 합니다
+        query_array = np.random.randn(7, 1)
+        query = (
+            Matrix(query_array).scale(vector_scale).shift(LEFT * 0.5).set_color(GREY_B)
+        )
+        query_text = (
+            Text("query", font_size=18)
+            .set_color(GREY_B)
+            .next_to(query, DOWN, buff=0.1)
+            .set_color(GREY_B)
+        )
+        query[3].become(Text("...", font_size=24).set_color(GREY_C).move_to(query[3]))
+        self.playw(FadeIn(VGroup(query, query_text), shift=RIGHT * 10), wait=0.5)
+
+        kqc = key_quantized.copy()
+        self.play(kqc.animate.next_to(query, RIGHT, buff=0.5), run_time=0.5)
+        kqt = (
+            Text("key_quantized", font_size=18)
+            .set_color(GREY_B)
+            .next_to(kqc, DOWN, buff=0.1)
+        )
+        self.playw(FadeIn(kqt), run_time=0.5, wait=0.5)
+
+        inner_result_array = np.sum(query_array[:, 0] * key_quantized_arr)
+        inner_result = (
+            Text(f"{inner_result_array:.2f}", font_size=24)
+            .set_color(GREY_B)
+            .move_to(VGroup(query, kqc).get_center())
+        )
+        self.playw(
+            FadeOut(VGroup(query, query_text), shift=RIGHT * 0.5),
+            FadeOut(VGroup(kqc, kqt), shift=LEFT * 0.5),
+            FadeIn(inner_result),
+            run_time=0.5,
+        )
+
+        biased_text = (
+            Words("(A little bit biased)", font_size=20)
+            .set_color(RED)
+            .next_to(inner_result, UP, buff=0.15)
+        )
+
+        ## 이게 가중치, 메인 메뉴인 셈이죠?
+        dot = Text("•", font_size=24).move_to(inner_result)
+        self.play(
+            FadeOut(inner_result),
+            FadeIn(VGroup(query, query_text), shift=LEFT * 0.5),
+            FadeIn(VGroup(kqc, kqt), shift=RIGHT * 0.5),
+            FadeIn(dot),
+        )
+        self.playw(FlashAround(VGroup(query, query_text, kqc, kqt)))
+
+        ## 그런데 여기엔 아까 말했듯이 quantization error가 있는데요
+        self.play(
+            FadeOut(VGroup(query, query_text), shift=RIGHT * 0.5),
+            FadeOut(VGroup(kqc, kqt), shift=LEFT * 0.5),
+            FadeOut(dot),
+            FadeIn(inner_result),
+            run_time=0.5,
+        )
+        self.playwl(
+            *[FadeIn(word, shift=UP * 0.2) for word in biased_text.words], lag_ratio=0.5
+        )
+
+        ## 여기에 QJL로 보정하는 사이드 메뉴를 더해줄 겁니다
+
+        bitsc = bits.copy()
+        items = VGroup(VGroup(biased_text, inner_result), bitsc)
+        self.playw(items.animate.arrange(RIGHT, buff=0.75))
+
+        ## query 쪽에도 똑같이 아까 그 gaussian 양념 matrix를 곱합니다
+        query_qjl = (
+            Matrix(query_array)
+            .scale(vector_scale)
+            .set_color(GREY_B)
+            .next_to(bitsc, LEFT, buff=0.75)
+        )
+        query_qjlt = (
+            Text("query", font_size=18)
+            .set_color(GREY_B)
+            .next_to(query_qjl, DOWN, buff=0.1)
+        )
+        self.play(
+            FadeIn(VGroup(query_qjl, query_qjlt), shift=RIGHT * 10),
+            items[0].animate.shift(UP * 2.5),
+        )
+
+        qjl_mat = Tex("M \\in \\mathbb{R}^{N \\times D}", font_size=36).next_to(
+            query_qjl, LEFT, buff=0.3
+        )
+        self.play(FadeIn(qjl_mat), run_time=0.5)
+        self.playwl(
+            FadeOut(qjl_mat[1:]),
+            qjl_mat[0].animate.next_to(query_qjl, LEFT, buff=0.3),
+            lag_ratio=0.5,
+            wait=0,
+        )
+
+        qjl_mat_arr = np.random.randn(7, 7)
+        qjl_result_arr = qjl_mat_arr @ residual_arr[:, None]
+        qjl_result = Matrix(qjl_result_arr).scale(vector_scale).move_to(query_qjl)
+        qjl_result[3].become(
+            Text("...", font_size=24).set_color(GREY_C).move_to(query_qjl[3])
+        )
+        self.playw(
+            Transform(query_qjl, qjl_result),
+            FadeOut(qjl_mat[0], shift=RIGHT * 0.5),
+            run_time=0.7,
+        )
+
+        ## 이 결과랑 아까 저장해둔 1bit 부호 정보를 내적하구요
+
+        sign_result_arr = bit_arr[:, None] * qjl_result_arr
+        sign_result = Matrix(sign_result_arr).scale(vector_scale).move_to(query_qjl)
+        sign_result[3].become(
+            Text("...", font_size=24).set_color(GREY_C).move_to(sign_result[3])
+        )
+        self.play(
+            Transform(query_qjl, sign_result),
+            FadeOut(bitsc, shift=LEFT * 0.8),
+            run_time=0.7,
+        )
+
+        inner_result_qjl_arr = np.sum(sign_result_arr)
+        inner_result_qjl = (
+            Text(f"{inner_result_qjl_arr:.2f}", font_size=24)
+            .set_color(GREY_B)
+            .move_to(sign_result)
+        )
+        big_sigma = Tex("\\Sigma", font_size=96).move_to(inner_result_qjl)
+        self.playw(
+            FadeOut(query_qjl),
+            FadeOut(query_qjlt),
+            FadeIn(inner_result_qjl),
+            FadeOut(big_sigma, scale=2),
+            run_time=0.5,
+        )
+
+        ## 거기에 수학적으로 건방진 계수 보정을 조금 해줍니다
+
+        coeff1 = Tex("\\frac{\\sqrt{\\pi / 2}}{D} \\cdot", font_size=32).next_to(
+            inner_result_qjl, LEFT, buff=0.15
+        )
+        coeff2 = Tex("||\\mathrm{residual}||_2 \\cdot", font_size=32).next_to(
+            coeff1, LEFT, buff=0.1
+        )
+        self.playw(FadeIn(VGroup(coeff1, coeff2), shift=LEFT * 0.5))
+
+        ## 이 값이 residual로 인한 attention 오차의 보정값입니다
+        self.playw(FlashAround(VGroup(coeff1, coeff2, inner_result_qjl), buff=0.05))
+
+        ## 아까 원래 quantize key로 내적한 결과에다가 이 보정값 사이드 메뉴를 더해주면은요
+
+        qk_result = items[0]
+        qjl_result = VGroup(coeff1, coeff2, inner_result_qjl)
+        self.playw(
+            VGroup(qk_result, qjl_result).animate.arrange(RIGHT, buff=0.75),
+            run_time=0.5,
+        )
+
+        plus = Text("+", font_size=36).next_to(qk_result, RIGHT, buff=0.2)
+        self.playw(FadeIn(plus))
+
+        self.embed()
+        ## 원래의 정확한 attention score에 좀 더 가까운 값을 얻을 수 있습니다
+        keyc = key.copy()
+        query_orig_arr = query_array.copy()
+        query_orig = Matrix(query_orig_arr).scale(vector_scale).set_color(GREY_B)
+        query_orig[3].become(
+            Text("...", font_size=24).set_color(GREY_C).move_to(query_orig[3])
+        )
+
+        origs = VGroup(query_orig, keyc)
+        origs.generate_target()
+        origs.target.arrange(RIGHT, buff=0.5).shift(UP * 2.5)
+        origs[0].move_to(origs.target[0]).shift(LEFT * 10)
+        at = Text("@", font_size=20).move_to(origs.target.get_center())
+        self.playwl(MoveToTarget(origs), FadeIn(at), lag_ratio=0.6, wait=0)
+        orig_query_text = (
+            Text("query", font_size=18)
+            .set_color(GREY_B)
+            .next_to(query_orig, DOWN, buff=0.1)
+        )
+        orig_key_text = (
+            Text("original key", font_size=18)
+            .set_color(GREEN)
+            .next_to(keyc, DOWN, buff=0.1)
+        )
+        self.play(FadeIn(orig_query_text), FadeIn(orig_key_text))
+
+        similar = Tex("\\approx", font_size=36).rotate(PI / 2).shift(UP * 0.75)
+        self.playw(FadeIn(similar))
+
+        ## 이렇게 QJL은요 1bit짜리 사이드 메뉴를 하나 추가해서 편향을 보정할 수 있습니다
+        ol = self.overlay
+        self.add(
+            rect_quant.set_z_index(ol.z_index + 1),
+            text_quant.set_z_index(ol.z_index + 1),
+            key_quantized.set_z_index(ol.z_index + 1),
+            bits.set_z_index(ol.z_index + 1),
+        )
+        self.play(
+            self.cf.animate.reorient(
+                0, 54, 0, (np.float32(5.1), np.float32(1.55), np.float32(0.01)), 4.54
+            ),
+            FadeIn(ol),
+        )
+        onebit = Text("1 bit array", font_size=18).next_to(bits[0], OUT, buff=0.5).rotate(PI / 4, axis=RIGHT).set_z_index(ol.z_index + 1)
+        self.playw(FadeIn(onebit, shift=OUT * 0.3))
+
