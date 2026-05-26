@@ -37,3 +37,44 @@ Turboquant2: Hypersphere + Randomized hadamard transform
 $ cd src/turboquant2
 $ uv run manimgl main.py
 ```
+
+## turboquant3
+Turboquant3: What is QJL?
+[[YouTube link]](https://youtu.be/Q2K9R9ghJvo) <br />
+```bash
+$ cd src/turboquant3
+$ uv run manimgl main.py
+```
+
+## Red vs Blue Quiz
+Red vs Blue Quiz: Probability quiz
+[[YouTube link]](https://youtu.be/kHV76TP12HQ) <br />
+```bash
+$ cd src/RvsBquiz
+$ uv run manimgl main.py
+```
+
+## Masked Diffusion Language Model
+Visualized Masked Diffusion Language Model inference
+[[YouTube link]](https://youtu.be/WWhCdO79rn4) <br />
+```bash
+$ cd src/mdlm
+$ uv run manimgl main.py
+```
+
+## \_\_all\_\_
+\_\_all\_\_ is convenient in Python
+[[YouTube link]](https://youtu.be/fg0LBpdElZw) <br />
+```bash
+$ cd src/dunder_all
+$ uv run manimgl main.py
+```
+
+## CFM vs Diffusion
+Flow matching vs Diffusion
+[[YouTube link]](https://youtu.be/mXTZ7wlm4G8) <br />
+```bash
+$ cd src/CFMvsDiffusion
+$ uv run manimgl main.py
+```
+
