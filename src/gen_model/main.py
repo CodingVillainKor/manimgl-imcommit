@@ -80,31 +80,133 @@ class intro(InteractiveScene, Scene2D):
         question_vgroup = (
             VGroup(question_theta, question_x, question_c)
             .arrange(RIGHT, buff=1.5)
-            .next_to(VGroup(surrounding_theta, surrounding_x, surrounding_c), DOWN, buff=1.5)
+            .next_to(
+                VGroup(surrounding_theta, surrounding_x, surrounding_c), DOWN, buff=1.5
+            )
         )
         question_x.shift(DOWN * 0.75)
-        arrow_theta = Arrow(question_theta.get_top(), surrounding_theta.get_bottom(), buff=0.1).set_color(RED)
-        arrow_x = Arrow(question_x.get_top(), surrounding_x.get_bottom(), buff=0.1).set_color(RED)
-        arrow_c = Arrow(question_c.get_top(), surrounding_c.get_bottom(), buff=0.1).set_color(RED)
-        
+        arrow_theta = Arrow(
+            question_theta.get_top(), surrounding_theta.get_bottom(), buff=0.1
+        ).set_color(RED)
+        arrow_x = Arrow(
+            question_x.get_top(), surrounding_x.get_bottom(), buff=0.1
+        ).set_color(RED)
+        arrow_c = Arrow(
+            question_c.get_top(), surrounding_c.get_bottom(), buff=0.1
+        ).set_color(RED)
+
         self.play(FadeIn(question_theta), FadeIn(arrow_theta))
-        self.play(FadeIn(question_x), FadeIn(arrow_x), self.cf.animate.move_to(VGroup(eq, question_vgroup)).scale(1.2))
+        self.play(
+            FadeIn(question_x),
+            FadeIn(arrow_x),
+            self.cf.animate.move_to(VGroup(eq, question_vgroup)).scale(1.2),
+        )
         self.playw(FadeIn(question_c), FadeIn(arrow_c))
 
-        self.embed()
         ## theta, x, c
-        theta_text = Text("Model Parameters", font_size=36).set_color(GREEN).move_to(question_theta).align_to(question_theta, RIGHT)
-        x_text = Text("Random Variables", font_size=36).set_color(GREEN).move_to(question_x)
-        c_text = Text("Model Inputs", font_size=36).set_color(GREEN).move_to(question_c).align_to(question_c, LEFT)
+        theta_text = (
+            Text("Model Parameters", font_size=36)
+            .set_color(GREEN)
+            .move_to(question_theta)
+            .align_to(question_theta, RIGHT)
+        )
+        x_text = (
+            Text("Random Variables", font_size=36).set_color(GREEN).move_to(question_x)
+        )
+        c_text = (
+            Text("Model Inputs", font_size=36)
+            .set_color(GREEN)
+            .move_to(question_c)
+            .align_to(question_c, LEFT)
+        )
 
         self.playw(
-            FadeTransform(question_theta, theta_text),
-            FadeTransform(question_x, x_text),
-            FadeTransform(question_c, c_text),
+            Transformr(question_theta, theta_text),
             arrow_theta.animate.set_color(GREEN),
-            arrow_x.animate.set_color(GREEN),
-            arrow_c.animate.set_color(GREEN),
             surrounding_theta.animate.set_color(GREEN),
+            wait=0.3,
+        )
+        self.playw(
+            Transformr(question_x, x_text),
+            arrow_x.animate.set_color(GREEN),
             surrounding_x.animate.set_color(GREEN),
+            wait=0.3,
+        )
+        self.playw(
+            Transformr(question_c, c_text),
+            arrow_c.animate.set_color(GREEN),
             surrounding_c.animate.set_color(GREEN),
+        )
+
+
+class GaussianSampling(InteractiveScene, Scene2D):
+    def construct(self):
+        x_range = [-3, 3]
+
+        ## gaussian distribution
+        nump = RaenimPlane(x_range=x_range, y_range=[-2, 2]).scale(1.5)
+        nump.y_axis.set_opacity(0)
+        fn = lambda x: np.exp(-(x**2))
+        gdist = nump.get_graph(fn, x_range=x_range)
+        gdist.set_color_by_gradient(GREY, RED, GREEN, GREY)
+        self.play(FadeIn(nump))
+        self.playw(ShowCreation(gdist))
+
+        ## sampling
+        nums = np.random.normal(0, 1, 3)
+        num_texts = VGroup(*[
+            Text(f"{num:.2f}", font_size=24)
+            .set_color(interpolate_color(RED, GREEN, (num + 3) / 6))
+            .next_to(nump.c2p(num, 0), DOWN, buff=0.1)
+            for num in nums
+        ])
+        lines = VGroup(*[
+            Line(
+                nump.c2p(num, 0),
+                nump.c2p(num, fn(num)),
+                color=interpolate_color(RED, GREEN, (num + 3) / 6),
+            )
+            for num in nums
+        ])
+        first = VGroup(nump, gdist, lines, num_texts)
+        self.playw(ShowCreation(lines), FadeIn(num_texts), run_time=0.6)
+
+        self.embed()
+        ## multiple sampling
+        def get_sample():
+            nump = RaenimPlane(x_range=x_range, y_range=[-2, 2]).scale(1.5)
+            nump.y_axis.set_opacity(0)
+            gdist = nump.get_graph(fn, x_range=x_range)
+            gdist.set_color_by_gradient(GREY, RED, GREEN, GREY)
+
+            nums = np.random.normal(0, 1, 3)
+            num_texts = VGroup(*[
+                Text(f"{num:.2f}", font_size=24)
+                .set_color(interpolate_color(RED, GREEN, (num + 3) / 6))
+                .next_to(nump.c2p(num, 0), DOWN, buff=0.1)
+                for num in nums
+            ])
+            lines = VGroup(*[
+                Line(
+                nump.c2p(num, 0),
+                nump.c2p(num, fn(num)),
+                color=interpolate_color(RED, GREEN, (num + 3) / 6),
+                )
+                for num in nums
+            ])
+            return VGroup(nump, gdist, lines, num_texts)
+
+        row, col = 4, 4
+        samples = VGroup(*[get_sample() for _ in range(row * col - 1)])
+        first_left = first.get_left()
+        first_top = first.get_top()
+        samples = (
+            VGroup(first, *samples)
+            .arrange_in_grid(n_rows=row, n_cols=col, buff=0.5)
+            .align_to([first_left[0], first_top[1], 0], UL)
+        )
+        self.playwl(
+            FadeIn(samples[1:], run_time=2),
+            self.cf.animate.scale(2.5).move_to(samples),
+            lag_ratio=0.5
         )
