@@ -78,3 +78,11 @@ $ cd src/CFMvsDiffusion
 $ uv run manimgl main.py
 ```
 
+## Generative model
+Generative model, what is θ, condition?
+[[YouTube link]](https://youtu.be/C_1lhmPOTt4) <br />
+```bash
+$ cd src/gen_model
+$ uv run manimgl main.py
+```
+
