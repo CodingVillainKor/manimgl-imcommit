@@ -1,22 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="400" height="200" viewBox="0 0 400 200">
-  <!-- 만원권 색감(연두빛 녹색)의 지폐 아이콘 -->
-  <defs>
-    <linearGradient id="bill" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%"  stop-color="#bcd9a8"/>
-      <stop offset="100%" stop-color="#92ba7d"/>
-    </linearGradient>
-  </defs>
+  <!-- KRW banknote icon (light green). Solid fill so ManimGL renders it; ManimGL ignores linearGradient (url() -> black). -->
 
-  <!-- 지폐 본체 -->
-  <rect x="20" y="50" width="360" height="100" rx="14" fill="url(#bill)" stroke="#4f7a48" stroke-width="4"/>
+  <!-- bill body -->
+  <rect x="20" y="50" width="360" height="100" rx="14" fill="#a7c992" stroke="#4f7a48" stroke-width="4"/>
 
-  <!-- 안쪽 테두리 -->
+  <!-- inner border -->
   <rect x="34" y="64" width="332" height="72" rx="8" fill="none" stroke="#4f7a48" stroke-width="2" opacity="0.5"/>
 
-  <!-- 가운데 액면 심볼 (\) -->
+  <!-- center denomination symbol -->
   <g>
     <circle cx="200" cy="100" r="30" fill="#6e9a59" stroke="#3f6238" stroke-width="3"/>
-    <!-- 원화 기호 W + 두 줄 -->
+    <!-- won mark W + two bars -->
     <g fill="none" stroke="#eef4e6" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M188 88 L194 112 L200 94 L206 112 L212 88"/>
       <line x1="185" y1="100" x2="215" y2="100"/>
@@ -24,7 +18,7 @@
     </g>
   </g>
 
-  <!-- 네 모서리 장식 호 -->
+  <!-- four corner arcs -->
   <g fill="none" stroke="#4f7a48" stroke-width="3" stroke-linecap="round" opacity="0.8">
     <path d="M52 74  a14 14 0 0 1 14 -14"/>
     <path d="M348 74 a14 14 0 0 0 -14 -14"/>

@@ -11,5 +11,5 @@ class intro(InteractiveScene, Scene2D):
         self.embed()
 
         ## intro
-        money = SVGMobject("money.svg").scale(0.5)
+        money = SVGMobject("money.svg", stroke_width=None).scale(0.5)
         self.playw(FadeIn(money))
