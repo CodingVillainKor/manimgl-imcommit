@@ -86,3 +86,10 @@ $ cd src/gen_model
 $ uv run manimgl main.py
 ```
 
+## Group Query Attention
+Attention -> Multihead Attention -> Group Query Attention
+[[YouTube link]](https://youtu.be/vEKhXxSlclY) <br />
+```bash
+$ cd src/gqa
+$ uv run manimgl main.py
+```
