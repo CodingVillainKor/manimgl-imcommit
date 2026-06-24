@@ -93,3 +93,11 @@ Attention -> Multihead Attention -> Group Query Attention
 $ cd src/gqa
 $ uv run manimgl main.py
 ```
+
+## Claude code X Notion
+Automatically summarize claude code works on notion by hook
+[[YouTube link]](https://youtu.be/B9xAVn0Rakc) <br />
+```bash
+$ cd src/clco_autohistory
+$ uv run manimgl main.py
+```
