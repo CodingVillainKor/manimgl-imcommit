@@ -101,3 +101,11 @@ Automatically summarize claude code works on notion by hook
 $ cd src/clco_autohistory
 $ uv run manimgl main.py
 ```
+
+## MLA
+Multihead Latent Attention
+[[YouTube link]](https://youtu.be/H16VTKyhuyI) <br />
+```bash
+$ cd src/MLA
+$ uv run manimgl main.py
+```
