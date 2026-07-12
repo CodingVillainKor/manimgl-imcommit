@@ -74,6 +74,6 @@ def _update(path_str):
         path.write_text(out, encoding="utf-8")
 
 
-_f = next((a for a in sys.argv if a.endswith(".py")), None)
+_f = next((a for a in sys.argv[1:] if a.endswith(".py")), None)
 if _f:
     _update(_f)
