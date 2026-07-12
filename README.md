@@ -109,3 +109,11 @@ Multihead Latent Attention
 $ cd src/MLA
 $ uv run manimgl main.py
 ```
+
+## Floating point
+Floating point representation
+[[YouTube link]](https://youtu.be/6J-S50vSBi4) <br />
+```bash
+$ cd src/floatingpoint
+$ uv run manimgl main.py
+```
