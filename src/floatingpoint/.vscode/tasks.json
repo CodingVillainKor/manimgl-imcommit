@@ -1,0 +1,25 @@
+{
+    // manimgl: runs _mupdater.py in its own python process (REPL-independent).
+    // Works regardless of whether the nearby terminal is bash, ipython, or closed.
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "mupdate",
+            "type": "process",
+            "command": "c:/Users/user/Documents/python/manim_prj/.venv/Scripts/python.exe",
+            "args": [
+                "c:/Users/user/Documents/python/manim_prj/_mupdater.py",
+                "${file}"
+            ],
+            "presentation": {
+                "reveal": "never",
+                "focus": false,
+                "echo": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": false
+            },
+            "problemMatcher": []
+        }
+    ]
+}
