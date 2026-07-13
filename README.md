@@ -117,3 +117,11 @@ Floating point representation
 $ cd src/floatingpoint
 $ uv run manimgl main.py
 ```
+
+## Claude code X Notion 2
+Notion database setting
+[[YouTube link]](https://youtu.be/tCqVm_wakPo) <br />
+```bash
+$ cd src/clco2
+$ uv run manimgl main.py
+```
