@@ -125,3 +125,11 @@ Notion database setting
 $ cd src/clco2
 $ uv run manimgl main.py
 ```
+
+## JustGRPO 1
+ICML 2026 Outstanding Paper Award
+[[YouTube link]](https://youtu.be/3rur_J298HA) <br />
+```bash
+$ cd src/justgrpo
+$ uv run manimgl main.py
+```
