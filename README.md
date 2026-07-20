@@ -133,3 +133,11 @@ ICML 2026 Outstanding Paper Award
 $ cd src/justgrpo
 $ uv run manimgl main.py
 ```
+
+## JustGRPO 2
+ICML 2026 Outstanding Paper Award - Full version
+[[YouTube link]](https://youtu.be/DGv27vi0oT4) <br />
+```bash
+$ cd src/justgrpo2
+$ uv run manimgl main.py
+```
