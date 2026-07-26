@@ -141,3 +141,11 @@ ICML 2026 Outstanding Paper Award - Full version
 $ cd src/justgrpo2
 $ uv run manimgl main.py
 ```
+
+## Paged Attention
+Paged Attention: Efficient KV cache saving
+[[YouTube link]](https://youtu.be/c-VZNLfZ93c) <br />
+```bash
+$ cd src/pagedAttn
+$ uv run manimgl main.py
+```
