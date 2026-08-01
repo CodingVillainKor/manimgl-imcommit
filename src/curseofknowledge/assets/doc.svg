@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="#FFFFFF">
+  <!-- [0] page body, corner folded at top-right -->
+  <path d="M24 14H60L76 30V86H24Z"/>
+  <!-- [1] folded flap -->
+  <path d="M60 14L76 30H60Z"/>
+  <!-- [2][3][4] text lines -->
+  <rect x="34" y="46" width="32" height="5" rx="2.5"/>
+  <rect x="34" y="58" width="32" height="5" rx="2.5"/>
+  <rect x="34" y="70" width="32" height="5" rx="2.5"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="#FFFFFF">
+  <!-- [0] slip body, corner folded at bottom-right -->
+  <path d="M20 24H80V56L60 76H20Z"/>
+  <!-- [1] folded flap -->
+  <path d="M80 56H60V76Z"/>
+</svg>
