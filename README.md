@@ -149,3 +149,19 @@ Paged Attention: Efficient KV cache saving
 $ cd src/pagedAttn
 $ uv run manimgl main.py
 ```
+
+## Bond interest
+If interest rate grows, bond price falls
+[[YouTube link]](https://youtu.be/PS1NsSxWVrI) <br />
+```bash
+$ cd src/bondinterest
+$ uv run manimgl main.py
+```
+
+## Curse of Knowledge
+Knowing too much can be a curse
+[[YouTube link]](https://youtu.be/PZNez-BVDk4) <br />
+```bash
+$ cd src/curseofknowledge
+$ uv run manimgl main.py
+```
