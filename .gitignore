@@ -13,6 +13,9 @@ wheels/
 media/
 MNIST/
 
+# downloaded datasets
+data/
+
 # Non-git projects
 test*/
 skipgit/
