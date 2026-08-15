@@ -165,3 +165,11 @@ Knowing too much can be a curse
 $ cd src/curseofknowledge
 $ uv run manimgl main.py
 ```
+
+## Claude code X Notion 3
+Automatically summarize claude code works on notion by stop hook
+[[YouTube link]](https://youtu.be/B2cDUYqmP6I) <br />
+```bash
+$ cd src/clco3
+$ uv run manimgl main.py
+```
