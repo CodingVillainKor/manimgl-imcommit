@@ -32,3 +32,6 @@ uv.lock
 # media files
 *.mp4
 *.gif
+
+# gigs
+gigs/
