@@ -173,3 +173,19 @@ Automatically summarize claude code works on notion by stop hook
 $ cd src/clco3
 $ uv run manimgl main.py
 ```
+
+## CLIP
+Contrastive Language-Image Pretraining
+[[YouTube link]](https://youtu.be/0srMzQ-t1oI) <br />
+```bash
+$ cd src/clip
+$ uv run manimgl main.py
+```
+
+## SigLIP
+Automatically summarize claude code works on notion by stop hook
+[[YouTube link]](https://youtu.be/BZkNFMZM17k) <br />
+```bash
+$ cd src/siglip
+$ uv run manimgl main.py
+```
