@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <!-- head -->
+  <path fill="#DDDDDD" d="M 50 12 A 18 18 0 1 1 50 48 A 18 18 0 1 1 50 12 Z"/>
+  <!-- neck -->
+  <path fill="#DDDDDD" d="M 43 42 L 57 42 L 57 62 L 43 62 Z"/>
+  <!-- shoulders / torso, with collar and backpack strap cut out -->
+  <path fill="#DDDDDD" fill-rule="evenodd" d="
+    M 16 92 C 16 68 31 57 50 57 C 69 57 84 68 84 92 Z
+    M 41 58 L 50 71 L 59 58 Z
+    M 32 68 L 61 92 L 68 92 L 39 65 Z
+  "/>
+</svg>
