@@ -197,3 +197,11 @@ Google DeepMind's SynthID
 $ cd src/synthid1
 $ uv run manimgl main.py
 ```
+
+## preLN
+Pre-Layer Normalization (preLN) in Transformers
+[[YouTube link]](https://youtu.be/hb_b6tIQgDI) <br />
+```bash
+$ cd src/preln
+$ uv run manimgl main.py
+```
