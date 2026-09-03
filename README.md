@@ -189,3 +189,11 @@ Automatically summarize claude code works on notion by stop hook
 $ cd src/siglip
 $ uv run manimgl main.py
 ```
+
+## SynthID1
+Google DeepMind's SynthID
+[[YouTube link]](https://youtu.be/8CV9GHclD0c) <br />
+```bash
+$ cd src/synthid1
+$ uv run manimgl main.py
+```
