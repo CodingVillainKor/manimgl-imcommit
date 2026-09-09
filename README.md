@@ -213,3 +213,11 @@ Linear attention mechanism
 $ cd src/linearAttn
 $ uv run manimgl main.py
 ```
+
+## Linear attention 2
+Linear attention 2
+[[YouTube link]](https://youtu.be/JQqXaCjW6Rw) <br />
+```bash
+$ cd src/linearAttn2
+$ uv run manimgl main.py
+```
