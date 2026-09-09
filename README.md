@@ -205,3 +205,11 @@ Pre-Layer Normalization (preLN) in Transformers
 $ cd src/preln
 $ uv run manimgl main.py
 ```
+
+## Linear attention 1
+Linear attention mechanism
+[[YouTube link]](https://youtu.be/znXc4YQ7g5U) <br />
+```bash
+$ cd src/linearAttn
+$ uv run manimgl main.py
+```
