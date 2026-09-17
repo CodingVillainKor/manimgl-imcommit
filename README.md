@@ -221,3 +221,19 @@ Linear attention 2
 $ cd src/linearAttn2
 $ uv run manimgl main.py
 ```
+
+## LoRA 1
+LoRA (Low-Rank Adaptation) technique for efficient fine-tuning
+[[YouTube link]](https://youtu.be/-gPar1nVrtk) <br />
+```bash
+$ cd src/lora1
+$ uv run manimgl main.py
+```
+
+## LoRA 2
+LoRA (Low-Rank Adaptation) for practical usage
+[[YouTube link]](https://youtu.be/vGyLTu8g35w) <br />
+```bash
+$ cd src/lora2
+$ uv run manimgl main.py
+```
