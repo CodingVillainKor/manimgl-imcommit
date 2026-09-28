@@ -237,3 +237,11 @@ LoRA (Low-Rank Adaptation) for practical usage
 $ cd src/lora2
 $ uv run manimgl main.py
 ```
+
+## Jev 1
+Jev is a multiple choice question-answering LLM framework
+[[YouTube link]](https://youtu.be/xHRNEWIeiig) <br />
+```bash
+$ cd src/jev1
+$ uv run manimgl main.py
+```
