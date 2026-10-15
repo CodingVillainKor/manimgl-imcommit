@@ -35,3 +35,6 @@ uv.lock
 
 # gigs
 gigs/
+
+# dotenv
+.env
