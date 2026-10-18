@@ -11,513 +11,422 @@ seed(41)
 np.random.seed(41)
 
 
-def _is_letter(c: str) -> bool:
-    o = ord(c)
-    return (
-        c.isascii()
-        and c.isalpha()
-        or 0x00C0 <= o <= 0x024F
-        and o not in (0xD7, 0xF7)  # Latin accents (é, ñ, ü), minus × ÷
-        or 0xAC00 <= o <= 0xD7A3  # Hangul syllables
-        or 0x3131 <= o <= 0x318E  # Hangul jamo (ㄱ, ㅏ)
-        or 0x3041 <= o <= 0x30FF  # Hiragana, Katakana
-        or 0x4E00 <= o <= 0x9FFF  # CJK ideographs
-        or 0x3400 <= o <= 0x4DBF  # CJK extension A
-    )
+def polar(deg):
+    return np.array([np.cos(deg * DEGREES), np.sin(deg * DEGREES), 0])
 
 
-def is_visual_token(tok: str, allow_punct: bool = False) -> bool:
-    # Korean/Japanese/CJK/Latin letters only (+ spaces); drops �, symbols, code, other scripts
-    if not any(_is_letter(c) for c in tok):
-        return False
-    extra = " " + ("0123456789.,!?'\"-:;()" if allow_punct else "")
-    return all(_is_letter(c) or c in extra for c in tok)
+class TokenNode(VGroup):
+    # [0]: rounded box, [1]: token text
+    def __init__(self, token: str, font_size=22, height=0.5):
+        text = Text(token, font_size=font_size)
+        box = RoundedRectangle(
+            width=max(text.get_width() + 0.3, height),
+            height=height,
+            corner_radius=0.08,
+        ).set_fill(BLACK, opacity=1)
+        text.move_to(box)
+        super().__init__(box, text)
+        self.normal().set_z_index(2)
+
+    def style(self, color, stroke_color=None, stroke_width=1.5):
+        self[0].set_stroke(stroke_color or color, stroke_width)
+        self[1].set_color(color)
+        return self
+
+    def normal(self):
+        return self.style(WHITE, GREY_B)
+
+    def mute(self):
+        return self.style(GREY_D, GREY_D)
+
+    def lit(self, color=YELLOW):
+        return self.style(color, color, 3)
 
 
-class intro(InteractiveScene, Scene2D):
+class generationExample(InteractiveScene, Scene2D):
+    def begin_animations(self, animations):
+        super().begin_animations(animations)
+        # group animations pull on-screen nodes into a z=0 wrapper; lift them back above the lines
+        self.add(
+            *[m for m in self.get_mobject_family_members() if isinstance(m, TokenNode)]
+        )
+
     def construct(self):
+        rng = np.random.default_rng(7)
+        GAP = 0.6
 
-        ## set-up
-        _line1 = (
-            DashedLine(UP * 10, DOWN * 10).shift(LEFT * 7.111111 / 3).set_color(GREY_D)
-        )
-        _line2 = (
-            DashedLine(UP * 10, DOWN * 10).shift(RIGHT * 7.111111 / 3).set_color(GREY_D)
-        )
-        _a1 = LEFT * 7.111111 * 2 / 3
-        _a2 = ORIGIN
-        _a3 = RIGHT * 7.111111 * 2 / 3
-        title_topp = (
-            Text("Top-p", font_size=24).move_to(_a1).shift(UP * 2.7).set_color(GREY_B)
-        )
-        title_topk = (
-            Text("Top-k", font_size=24).move_to(_a2).shift(UP * 2.7).set_color(GREY_B)
-        )
-        title_temp = (
-            Text("Temperature", font_size=24)
-            .move_to(_a3)
-            .shift(UP * 2.7)
-            .set_color(GREY_B)
-        )
-        self.addw(_line1, _line2, title_topp, title_topk, title_temp)
+        def prob_width(p):
+            return 1.5 + 8 * p
 
-        ## top_p bar
-        w = 3.5
-        top_p_bar = (
-            Rectangle(width=w, height=0.5).move_to(_a1).set_color(GREY_B).set_opacity(0)
-        )
-        _top_p90 = (
-            top_p_bar.copy()
-            .stretch_to_fit_width(w * 0.9)
-            .align_to(top_p_bar, LEFT)
-            .set_opacity(0)
-        )
-        line_90 = DashedLine(
-            _top_p90.get_corner(UR), _top_p90.get_corner(DR)
-        ).set_color(PURE_GREEN)
-        topp_90b = Brace(_top_p90, UP, buff=0.05)
-        topp_90b_text = Text("0.9", font_size=18, font=MONO_FONT).next_to(
-            topp_90b, UP, buff=0.05
-        )
-        total_b = Brace(top_p_bar, DOWN, buff=0.05).set_color(GREY_C)
-        total_text = (
-            Text("1.0", font_size=18, font=MONO_FONT)
-            .next_to(total_b, DOWN, buff=0.05)
-            .set_color(GREY_B)
-        )
-        probs = VGroup()
-        prob_num = 0
-        for i, p in enumerate(
-            [0.4, 0.2, 0.15, 0.12, 0.05, 0.04, 0.008, 0.006, 0.006] + [0.004] * 5
-        ):
-            if prob_num < 0.9:
-                opacity = 0.3
-                stroke_color = YELLOW_A
-            else:
-                opacity = 0
-                stroke_color = interpolate_color(YELLOW_A, BLACK, 0.8)
-            prob = (
-                Rectangle(width=w * p, height=0.5)
-                .set_color(YELLOW_A)
-                .set_stroke(width=0.5, color=stroke_color)
+        def fan(src, tokens, angles, dist):
+            nodes = VGroup(
+                *[
+                    TokenNode(t).move_to(src.get_center() + polar(a) * dist)
+                    for t, a in zip(tokens, angles)
+                ]
             )
-            prob_num += p
-            if i == 0:
-                prob.align_to(top_p_bar, LEFT)
-            else:
-                prob.next_to(probs[-1], RIGHT, buff=0)
-            prob.set_fill(opacity=opacity)
-            probs.add(prob)
-
-        self.add(top_p_bar, probs)
-        self.playw(
-            FadeIn(topp_90b),
-            FadeIn(topp_90b_text),
-            FadeIn(line_90),
-            FadeIn(total_b),
-            FadeIn(total_text),
-        )
-
-        ## top_k bar
-        top_k_bar = Rectangle(width=w, height=0.5).move_to(_a2).set_color(GREY_B)
-        k = 3
-        probs = VGroup()
-        prob_num = 0
-        for i, p in enumerate(
-            [0.4, 0.2, 0.15, 0.12, 0.05, 0.04, 0.008, 0.006, 0.006] + [0.004] * 5
-        ):
-            if i >= k:
-                opacity = 0
-                stroke_color = interpolate_color(YELLOW_A, BLACK, 0.8)
-            else:
-                opacity = 0.3
-                stroke_color = YELLOW_A
-            prob = (
-                Rectangle(width=w * p, height=0.5)
-                .set_color(YELLOW_A)
-                .set_stroke(width=0.5, color=stroke_color)
+            edges = VGroup(
+                *[
+                    DashedLine(src.get_center(), n.get_center(), dash_length=0.1)
+                    .set_stroke(GREY_C, 2)
+                    .set_z_index(0)
+                    for n in nodes
+                ]
             )
-            prob_num += p
-            if i == 0:
-                prob.align_to(top_k_bar, LEFT)
-            else:
-                prob.next_to(probs[-1], RIGHT, buff=0)
-            prob.set_fill(opacity=opacity)
-            probs.add(prob)
+            return nodes, edges
 
-        top_k_text = (
-            Text("Top 3", font_size=18, font=MONO_FONT)
-            .next_to(probs[:3], UP, buff=0.75)
-            .set_color(YELLOW_B)
-        )
-        top_k_lines = VGroup(
-            *[DashedLine(top_k_text, prob.get_top()) for prob in probs[:3]]
-        ).set_color(YELLOW_B)
-        self.playw(
-            FadeIn(top_k_text), FadeIn(top_k_lines), FadeIn(top_k_bar), FadeIn(probs)
-        )
+        def half_extent(mob, direction):
+            return abs(direction[0]) * mob.get_width() / 2 + abs(direction[1]) * mob.get_height() / 2
 
-        ## temperature
+        def pct_labels(src, nodes, angles, probs, font_size=20, gap=0.15):
+            # sits on the clockwise side of each edge, `gap` away from the line,
+            # centred on the part of the edge visible between the two boxes
+            labels = VGroup()
+            for n, a, p in zip(nodes, angles, probs):
+                label = Integer(round(p * 100), unit="%", font_size=font_size)
+                label.set_color(GREY_B).set_z_index(2)
+                d, perp = polar(a), polar(a - 90)
+                start = src.get_center() + d * half_extent(src, d)
+                end = n.get_center() - d * half_extent(n, d)
+                mid = (start + end) / 2
+                labels.add(label.move_to(mid + perp * (gap + half_extent(label, perp))))
+            return labels
 
-        word_bars = VGroup()
-        prob_list = [0.4, 0.2, 0.15, 0.12, 0.05, 0.04, 0.008, 0.006, 0.006] + [
-            0.004
-        ] * 5
-        denom = 50
-        logit_list = [math.log(p * denom) for p in prob_list]
-        for i, p in enumerate(prob_list):
-            bar = (
-                Rectangle(height=w * p, width=0.2)
-                .set_stroke(width=1)
-                .set_fill(BLUE_A, opacity=0.3)
+        SUB = 0.15  # bottom fraction of the frame kept empty for subtitles
+
+        def frame_to(*mobs, margin=1.3, min_height=5.5):
+            g = VGroup(*mobs)
+            aspect = self.cf.get_width() / self.cf.get_height()
+            h = max(g.get_height(), g.get_width() / aspect, min_height / margin)
+            h *= margin / (1 - SUB)
+            return (
+                self.cf.animate.scale(h / self.cf.get_height())
+                .move_to(g.get_center() + DOWN * SUB * h / 2)
             )
-            word_bars.add(bar)
-        # word_bars.shuffle()
-        word_bars.arrange(RIGHT, buff=0.1, aligned_edge=DOWN).move_to(_a3)
-        self.add(word_bars)
 
-        ## change temperature
-        temp = ValueTracker(1.0)
-        temp_text = Text("temperature:", font_size=18, font=MONO_FONT).next_to(
-            word_bars, DOWN, buff=0.5
-        )
-
-        def get_temp_value(temperature):
-            return DecimalNumber(
-                temperature, num_decimal_places=2, font_size=18
-            ).next_to(temp_text, RIGHT, buff=0.1)
-
-        temp_value = get_temp_value(temp.get_value())
-        self.addw(temp_text, temp_value, wait=0.5)
-
-        ## update temperature value when temp changes
-        def update_temp_value(mob):
-            mob.become(get_temp_value(temp.get_value()))
-
-        _word_bars = word_bars.copy()
-
-        def softmax_robust(x, temperature):
-            x_max = max(x)
-            e_x = [math.exp((xi - x_max) / temperature) for xi in x]
-            sum_e_x = sum(e_x)
-            return [xi / sum_e_x for xi in e_x]
-
-        def update_word_bars(mob):
-            prob_list = softmax_robust(logit_list, temp.get_value())
-            for i, bar in enumerate(mob):
-                bar.stretch_to_fit_height(w * prob_list[i]).align_to(
-                    _word_bars[i], DOWN
-                )
-
-        word_bars.add_updater(update_word_bars)
-        temp_value.add_updater(update_temp_value)
-
-        self.play(temp.animate.set_value(5.0), run_time=2)
-        self.playw(temp.animate.set_value(0.3), run_time=2)
-
-
-class LLMOutput(InteractiveScene, Scene2D):
-    def construct(self):
-
-        ## llm
-        llm_box = (
-            Rectangle(width=4, height=2)
-            .set_color(BLUE_A)
-            .set_stroke(width=2)
-            .set_fill(BLACK, opacity=0.7)
-        )
-        llm_text = (
-            Text("LLM", font_size=20).align(llm_box, UR, buff=0.05).set_color(GREY_B)
-        )
-        llm = VGroup(llm_box, llm_text).set_z_index(1)
-
-        text = Words("[assistant] ... [user] piui가 뭔가요? [assistant]", font_size=18)
-        for w in text.words:
-            w.rotate(PI / 2)
-        text.words.arrange(RIGHT, aligned_edge=UP).next_to(llm, DOWN, buff=0.3).align(
-            llm, LEFT, buff=0.3
-        )
-
-        latent = (
-            Tensor(len(text.words), arrange=RIGHT)
-            .scale(0.85)
-            .move_to(llm)
-            .align(llm, LEFT, buff=0.3)
-        )
-        input_lines = VGroup(
-            *[
-                DashedLine(start=w.get_top(), end=l.get_bottom())
-                for w, l in zip(text.words, latent)
-            ]
-        )
-
-        output = (
-            Tensor(1).scale(0.85).next_to(llm, UP, buff=0.3).align_to(latent[-1], LEFT)
-        )
-        output_lines = VGroup(
-            *[DashedLine(start=l.get_top(), end=output.get_bottom()) for l in latent]
-        )
-
-        self.add(llm, text, latent, input_lines, output, output_lines)
-
-        ## output probs
-
-        def get_prob_tag(prob, text: str):
-            prob = DecimalNumber(prob, num_decimal_places=2, font_size=18)
-            t = Text(text, font_size=18)
-            box = SurroundingRectangle(
-                VGroup(prob, t).arrange(RIGHT, buff=0.15), color=GREY_B, buff=0.1
+        def glance(nodes, color=YELLOW, lag_ratio=0.35):
+            # Indicate on the text only: on the whole node it would also fill the box
+            return LaggedStart(
+                *[
+                    AnimationGroup(
+                        Indicate(n[1], scale_factor=1, color=color),
+                        n[0].animate(rate_func=there_and_back).set_stroke(color, 3),
+                    )
+                    for n in nodes
+                ],
+                lag_ratio=lag_ratio,
             )
-            return VGroup(prob, t, box)
 
-        prob_tags = VGroup()
-        for prob, text in zip(
-            [0.3, 0.4, 0.2, 0.1], ["token1", "token2", "token3", "..."]
-        ):
-            prob_tags.add(get_prob_tag(prob, text))
-        prob_tags[0].rotate(3 * PI / 4).next_to(output, UP).shift(LEFT * 1.5)
-        prob_tags[1].rotate(2 * PI / 3).next_to(prob_tags[0], RIGHT, buff=-0.1).shift(
-            UP * 0.5
-        )
-        prob_tags[2].rotate(PI / 3).next_to(prob_tags[1], RIGHT, buff=0.2)
-        prob_tags[3].rotate(PI / 4).next_to(
-            prob_tags[2], RIGHT, buff=-0.3, aligned_edge=DOWN
-        ).shift(DOWN * 0.5)
-
-        prob_lines = VGroup(
-            DashedLine(start=output.get_top(), end=prob_tags[0]),
-            DashedLine(start=output.get_top(), end=prob_tags[1]),
-            DashedLine(start=output.get_top(), end=prob_tags[2]),
-            DashedLine(start=output.get_top(), end=prob_tags[3]),
-        )
-        pl0, pl1, pl2, pl3 = prob_lines
-
-        self.addw(prob_tags, pl0, pl1, pl2, pl3)
-
-        ## RWiggle
-        pl0.add_updater(
-            lambda m: m.become(DashedLine(start=output.get_top(), end=prob_tags[0]))
-        )
-        pl1.add_updater(
-            lambda m: m.become(DashedLine(start=output.get_top(), end=prob_tags[1]))
-        )
-        pl2.add_updater(
-            lambda m: m.become(DashedLine(start=output.get_top(), end=prob_tags[2]))
-        )
-        pl3.add_updater(
-            lambda m: m.become(DashedLine(start=output.get_top(), end=prob_tags[3]))
-        )
-
-        self.playw(*[RWiggle(pt, amp=0.2, speed=2) for pt in prob_tags], run_time=4)
-
-
-class LLMOutputProbs(InteractiveScene, Scene2D):
-    def construct(self):
-
-        ## prepare
-
-        ## llm
-        llm_box = (
-            Rectangle(width=4, height=2)
-            .set_color(BLUE_A)
-            .set_stroke(width=2)
-            .set_fill(BLACK, opacity=0.7)
-        )
-        llm_text = (
-            Text("LLM", font_size=20).align(llm_box, UR, buff=0.05).set_color(GREY_B)
-        )
-        llm = VGroup(llm_box, llm_text).set_z_index(1)
-
-        text = Words("[assistant] ... [user] piui가 뭔가요? [assistant]", font_size=18)
-        for w in text.words:
-            w.rotate(PI / 2)
-        text.words.arrange(RIGHT, aligned_edge=UP).next_to(llm, DOWN, buff=0.3).align(
-            llm, LEFT, buff=0.3
-        )
-
-        latent = (
-            Tensor(len(text.words), arrange=RIGHT)
-            .scale(0.85)
-            .move_to(llm)
-            .align(llm, LEFT, buff=0.3)
-        )
-        input_lines = VGroup(
-            *[
-                DashedLine(start=w.get_top(), end=l.get_bottom())
-                for w, l in zip(text.words, latent)
-            ]
-        )
-
-        output = (
-            Tensor(1).scale(0.85).next_to(llm, UP, buff=0.3).align_to(latent[-1], LEFT)
-        )
-        output_lines = VGroup(
-            *[DashedLine(start=l.get_top(), end=output.get_bottom()) for l in latent]
-        )
-
-        self.addw(llm, text, latent, input_lines, output, output_lines)
-
-        ## vocab indices
-
-        vocabs_list = [t for t in vocab() if is_visual_token(t)][1100:1400]
-        vocabs = VGroup(
-            *[Words(f"{i}: {t}", font_size=24) for i, t in enumerate(vocabs_list, 1100)]
-        ).arrange_in_grid(n_rows=20, n_cols=15, buff=0.05, aligned_edge=LEFT)
-        vocabs.next_to(output, UP)
-        self.cf.save_state()
-        self.playwl(
-            FadeIn(vocabs),
-            self.cf.animate.reorient(
-                -27, 44, 0, (np.float32(-0.35), np.float32(3.63), np.float32(0.2)), 2.81
-            ),
-            lag_ratio=0.3,
-        )
-
-        ## numbers
-        nums = VGroup(*[ws.words[0][:-1] for ws in vocabs])
-        rest = VGroup(*[ws.words[1:] for ws in vocabs])
-        self.playw(nums.animate.set_color(GREEN), rest.animate.set_color(GREY_D))
-
-        ## RWiggle numbers
-        self.playw(*[RWiggle(num, amp=0.05, speed=2) for num in nums], run_time=1.5)
-
-        ## restore camera, Wo
-        Wo = (
-            Tex("W_o", font_size=24)
-            .add_background_rectangle()
-            .set_z_index(2)
-            .next_to(latent[-1], UP)
-            .align(llm, UP, buff=0.1)
-        )
-        self.add(Wo)
-        self.playw(self.cf.animate.restore(), FadeOut(vocabs))
-
-        ## wo to UR
-        self.play(Wo.animate.shift(UR + RIGHT * 0.3))
-        r, w = 5, 9
-        eq = Text("=", font_size=20).next_to(Wo, RIGHT, buff=0.1)
-        mat_Wo = randn(r, w).scale(0.22).next_to(eq, RIGHT, buff=0.1)
-        for i in range(r * w):
-            if i % w == w // 2:
-                mat_Wo[i].become(Text("...", font_size=18).move_to(mat_Wo[i]))
-            elif (w * (r // 2)) <= i < (w * (r // 2 + 1)):
-                mat_Wo[i].become(Text("...", font_size=18).move_to(mat_Wo[i]))
-        d_brace = Brace(mat_Wo, RIGHT, buff=0.05)
-        d_text = d_brace.get_text("D", font_size=20)
-        v_brace = Brace(mat_Wo, UP)
-        v_text = v_brace.get_text("V", font_size=20)
-        self.playw(
-            FadeIn(eq),
-            FadeIn(mat_Wo),
-            FadeIn(d_brace),
-            FadeIn(d_text),
-            FadeIn(v_brace),
-            FadeIn(v_text),
-        )
-
-        ## FadeOut(ds)
-        self.play(Circumscribe(d_text, color=RED), run_time=0.75)
-        self.playw(FadeOut(d_brace), FadeOut(d_text), run_time=0.75)
-
-        ## V is important
-        for i in range(3):
+        def shoot(src, node, color=YELLOW, wait=0.5):
+            # one sample: a dot leaves src and lands on node
+            dot = Dot(radius=0.08).set_color(color).move_to(src).set_z_index(1)
+            self.add(dot)
+            self.play(dot.animate(rate_func=rush_into).move_to(node), run_time=0.6)
+            self.remove(dot)
             self.playw(
-                Circumscribe(v_text, color=YELLOW),
-                run_time=0.5,
-                wait=1 if i == 2 else 0,
+                node.animate(rate_func=there_and_back).lit(color),
+                run_time=0.6,
+                wait=wait,
             )
 
-        ## fadeout mat, Wo and nums
-        n_nums = 41
-        nums = randn(1, n_nums).scale(0.3).next_to(output, UP)
-        nums[n_nums // 2].become(Text("...", font_size=18).move_to(nums[n_nums // 2]))
-        self.playwl(
-            AnimationGroup(
-                FadeOut(mat_Wo),
-                FadeOut(eq),
-                FadeOut(v_brace),
-                FadeOut(v_text),
-                FadeOut(Wo),
-            ),
-            FadeIn(nums, shift=nums.get_center() - output.get_center(), scale=40),
-            lag_ratio=0.3,
-        )
+        def flow(src, nodes, angles, counts, run_time=3):
+            # many samples: each dot flies through its word and stacks in its own slot
+            order = [i for i, c in enumerate(counts) for _ in range(c)]
+            rng.shuffle(order)
+            filled = [0] * len(nodes)
+            dots, anims = VGroup(), []
+            for i in order:
+                slot = nodes[i].get_center() + polar(angles[i]) * (
+                    0.55 + 0.09 * filled[i]
+                )
+                filled[i] += 1
+                dot = Dot(radius=0.05).set_color(YELLOW).move_to(src).set_z_index(1)
+                dots.add(dot)
+                anims.append(dot.animate.move_to(slot))
+            self.add(*dots)
+            self.playwl(*anims, lag_ratio=0.12, run_time=run_time)
+            return dots
 
-        ## z_i texts
-        texs = VGroup(
-            *[
-                Tex("z_{" + str(idx) + "}", font_size=24).next_to(nums[i], UP)
-                for i, idx in enumerate(range(1536, 1536 + n_nums))
-            ]
-        ).set_color(YELLOW_B)
-        texs[n_nums // 2].become(Text("...", font_size=18).move_to(texs[n_nums // 2]))
-        self.playwl(*[FadeIn(tex, run_time=0.25) for tex in texs], lag_ratio=0.85)
+        def ghost_tree(node, angle, depth=3, length=0.8, spread=32):
+            levels = [VGroup() for _ in range(depth)]
+            tips = VGroup()
 
-        ## negative nums in nums to be red
-        nval = nums.val
-        neg_idx = [i for i, val in enumerate(nval[0]) if val < 0]
-        nonneg_idx = [i for i, val in enumerate(nval[0]) if val >= 0]
-        self.play(
-            *[nums[i].animate.set_color(RED) for i in neg_idx],
-            *[nums[i].animate.set_color(GREY_C) for i in nonneg_idx],
+            def grow(p, a, d, l):
+                n = int(rng.choice([2, 3]))
+                for da in np.linspace(-spread, spread, n) + rng.uniform(-8, 8, n):
+                    q = p + polar(a + da) * l
+                    levels[d].add(
+                        Line(p, q).set_stroke(GREY_C, 1.5, opacity=0.8 - 0.2 * d)
+                    )
+                    if d + 1 < depth:
+                        grow(q, a + da, d + 1, l * 0.75)
+                    else:
+                        tips.add(Dot(q, radius=0.03).set_color(GREY_C))
+
+            grow(node.get_center() + polar(angle) * 0.4, angle, 0, length)
+            return VGroup(*levels, tips)
+
+        def grow_tree(tree, run_time=1.5):
+            *levels, tips = tree
+            return LaggedStart(
+                *[AnimationGroup(*[Create(l) for l in lv]) for lv in levels],
+                FadeIn(tips),
+                lag_ratio=0.6,
+                run_time=run_time,
+            )
+
+        def grow_step(prev, nxt, color=YELLOW):
+            # fork: chosen link + two ghost stubs, then nxt fades in
+            base = prev.get_right()
+            link = Line(base, nxt.get_left()).set_stroke(color, 3).set_z_index(1)
+            stubs = VGroup(
+                *[
+                    DashedLine(base, base + polar(a) * 0.5, dash_length=0.06)
+                    for a in (38, -38)
+                ]
+            )
+            stub_tips = VGroup(
+                *[Circle(radius=0.04).move_to(s.get_end()) for s in stubs]
+            )
+            stub = VGroup(stubs, stub_tips).set_stroke(GREY_D, 1.5)
+            self.play(Create(link), Create(stubs), FadeIn(stub_tips), run_time=0.3)
+            self.play(FadeIn(nxt), run_time=0.4)
+            return link, stub
+
+        # question node
+        root = TokenNode("piui가 뭐야?", font_size=26, height=0.65).style(
+            WHITE, BLUE_A, 2
         )
+        angles1 = [45, -45, -135, 135]
+        probs1 = [0.70, 0.18, 0.08, 0.04]
+        nodes1, edges1 = fan(root, ["pi", "지금부터", "웹", "..."], angles1, 2.3)
+        pcts1 = pct_labels(root, nodes1, angles1, probs1)
+        jg = nodes1[1]
+
+        self.cf.scale(0.5)
+        self.playw(FadeIn(root, scale=0.8), wait=0.5)
+
+        # first output: four branches burst out
+        self.add(*edges1, *nodes1)
         self.playw(
-            *[
-                nums[i].animate(rate_func=there_and_back).shift(DOWN * 0.2)
-                for i in neg_idx
-            ],
-            wait=3,
+            self.cf.animate.scale(7.2 / self.cf.get_height()).move_to(DOWN * 0.55),
+            LaggedStart(
+                *[
+                    AnimationGroup(Create(e), FadeIn(n, shift=polar(a) * 0.5))
+                    for e, n, a in zip(edges1, nodes1, angles1)
+                ],
+                lag_ratio=0.2,
+            ),
+            run_time=1.5,
         )
 
-        ## argmax_idx
-        argmax_idx = nval[0].argmax()
-        self.play(nums[argmax_idx].animate.set_color(GREEN))
+        # three words are likely: eyes go to each, "..." recedes
+        self.playw(
+            glance(nodes1[:3]),
+            nodes1[3].animate.mute(),
+            edges1[3].animate.set_stroke(GREY_D),
+        )
+
+        # "pi" is the most likely: its branch gets thick
+        self.playw(
+            edges1[0].animate.set_stroke(GREY_B, prob_width(probs1[0])),
+            nodes1[0].animate.scale(1.15),
+        )
+
+        # "지금부터", "웹" are plausible too
+        self.playw(
+            LaggedStart(
+                *[
+                    AnimationGroup(
+                        edges1[i].animate.set_stroke(GREY_B, prob_width(probs1[i])),
+                        RWiggle(nodes1[i], amp=0.08, speed=3, run_time=1),
+                    )
+                    for i in (1, 2)
+                ],
+                lag_ratio=0.4,
+            ),
+            edges1[3].animate.set_stroke(width=prob_width(probs1[3])),
+        )
+
+        # probabilistically: everything dims
+        self.playw(
+            *[n.animate.mute() for n in nodes1],
+            *[e.animate.set_stroke(GREY_D) for e in edges1],
+            wait=0.5,
+        )
+
+        # x% "pi", y% "지금부터", z% "웹": spotlight moves with a counting label
         for i in range(3):
-            self.play(Circumscribe(nums[argmax_idx], color=GREEN), run_time=0.75)
-        ## word
-        word = (
-            Words(vocabs_list[36], font_size=32)
-            .set_color(GREEN)
-            .next_to(texs[argmax_idx], UP)
-        )
-        self.playw(FadeIn(word, shift=UP * 0.5))
-
-        ## prob_lines
-        prob_lines = VGroup(
-            *[
-                Line(start=output.get_top(), end=nums[i].get_bottom(), stroke_width=2)
-                for i in range(n_nums)
+            anims = [
+                nodes1[i].animate.lit(),
+                edges1[i].animate.set_stroke(YELLOW),
+                FadeIn(pcts1[i].set_color(YELLOW)),
             ]
-        ).set_opacity(0.5)
-        self.playw(FadeIn(prob_lines), wait=4)
+            if i > 0:
+                anims += [
+                    nodes1[i - 1].animate.mute(),
+                    edges1[i - 1].animate.set_stroke(GREY_D),
+                    pcts1[i - 1].animate.set_color(GREY_B),
+                ]
+            self.playw(*anims)
 
-        ## sum(nums) by Joiner
-        nums.save_state()
-        self.cf.save_state()
-        nums.generate_target()
-        sum_nums = (
-            Joiner(*nums.target, join=lambda: Text("+", font_size=20))
-            .arrange(RIGHT, buff=0.05)
-            .add_background_rectangle()
-            .next_to(texs, UP, buff=1.5)
+        # sample with those odds: 20 draws pile up next to their words
+        self.play(
+            *[n.animate.normal() for n in nodes1],
+            *[e.animate.set_stroke(GREY_B) for e in edges1],
+            pcts1[2].animate.set_color(GREY_B),
+            FadeIn(pcts1[3]),
+        )
+        dots1 = flow(root, nodes1, angles1, [13, 4, 2, 1])
+
+        # each time you ask, the first word can change
+        self.play(FadeOut(dots1))
+        shoot(root, nodes1[2])
+        shoot(root, nodes1[0])
+
+        # so everything after it differs
+        trees1 = [ghost_tree(nodes1[i], angles1[i], length=0.7) for i in range(3)]
+        self.playw(
+            LaggedStart(*[grow_tree(t) for t in trees1], lag_ratio=0.25), wait=1.5
         )
 
-        self.playwl(
-            MoveToTarget(nums),
-            self.cf.animate.reorient(-90, 46, 90, (np.float32(-5.01), np.float32(4.08), np.float32(-2.64)), 8.52),
-            FadeIn(sum_nums[2::2]),
-            lag_ratio=0.3,
+        # this time: the second most likely, "지금부터"
+        self.play(*[FadeOut(t) for t in trees1])
+        self.play(Circumscribe(pcts1[1], color=YELLOW), run_time=0.75)
+        shoot(root, jg, wait=0)
+
+        # "지금부터" is sampled; the rest fall away and the camera follows
+        chosen1 = Line(root.get_center(), jg.get_center()).set_stroke(YELLOW, 4)
+        chosen1.set_z_index(1)
+        angles2 = [90, 0, -90, 180]
+        probs2 = [0.41, 0.27, 0.22, 0.10]
+        nodes2, edges2 = fan(jg, ["pi", "찾아보", "검색을", "..."], angles2, 1.7)
+        pcts2 = pct_labels(jg, nodes2, angles2, probs2, font_size=16, gap=0.08)
+        self.playw(
+            jg.animate.lit(),
+            Create(chosen1),
+            FadeOut(VGroup(*[nodes1[i] for i in (0, 2, 3)], edges1, pcts1)),
+            frame_to(jg, nodes2, margin=1.5),
+            run_time=1.5,
         )
 
-        ## lagged circumscribe negative numbers
-        self.playwl(
+        # what comes next? same fan, unknown words
+        qs = VGroup(*[TokenNode("?").mute().move_to(n) for n in nodes2])
+        self.add(*edges2, *qs)
+        self.play(
+            LaggedStart(
+                *[
+                    AnimationGroup(Create(e), FadeIn(q, shift=polar(a) * 0.4))
+                    for e, q, a in zip(edges2, qs, angles2)
+                ],
+                lag_ratio=0.2,
+            )
+        )
+        self.playw(*[RWiggle(q, amp=0.05, speed=4, run_time=1) for q in qs])
+
+        # its own next-word probabilities
+        self.playw(
+            LaggedStart(
+                *[FadeTransform(q, n) for q, n in zip(qs, nodes2)], lag_ratio=0.15
+            ),
             *[
-                FlashUnder(nums[i], color=RED, buff=0.05)
-                for i in neg_idx
+                e.animate.set_stroke(GREY_B, prob_width(p))
+                for e, p in zip(edges2, probs2)
             ],
-            lag_ratio=0.1,
+            FadeIn(pcts2),
         )
 
-        self.embed()
-        ## restore nums state
-        self.playwl(Restore(nums), Restore(self.cf), FadeOut(sum_nums[2::2]))
+        # sample from them
+        dots2 = flow(jg, nodes2, angles2, [8, 6, 4, 2])
+
+        # many possible outputs
+        self.play(FadeOut(dots2))
+        self.playw(glance(nodes2[:3]))
+
+        # sampled sentences
+        chain_specs = [["ui", "를", "알아볼", "게요"], ["겠습니다"], ["통해"]]
+        chains = []
+        for i, tokens in enumerate(chain_specs):
+            row = VGroup(nodes2[i])
+            for t in tokens:
+                row.add(TokenNode(t).next_to(row[-1], RIGHT, buff=GAP))
+            chains.append(row)
+        tail = (
+            VGroup(*[Dot(radius=0.04) for _ in range(3)])
+            .arrange(RIGHT, buff=0.12)
+            .next_to(chains[2], RIGHT, buff=0.3)
+            .set_color(YELLOW)
+        )
+
+        def run_chain(i, *added_anims, color=YELLOW):
+            row = chains[i]
+            head = Line(jg.get_center(), row[0].get_center()).set_stroke(color, 4)
+            head.set_z_index(1)
+            self.play(
+                Create(head),
+                row[0].animate.lit(color),
+                frame_to(jg, row, tail if i == 2 else row),
+                *added_anims,
+            )
+            links, stubs = VGroup(head), VGroup()
+            for prev, nxt in zip(row[:-1], row[1:]):
+                nxt.lit(color)
+                link, stub = grow_step(prev, nxt, color)
+                links.add(link)
+                stubs.add(stub)
+            return links, stubs
+
+        def settle(row, links):
+            return [
+                *[n.animate.normal() for n in row],
+                links.animate.set_stroke(GREY_B),
+            ]
+
+        # "지금부터", "pi", "ui", "를", "알아볼", "게요"
+        links1, _ = run_chain(0, FadeOut(pcts2))
+        self.wait()
+
+        # "지금부터", "찾아보", "겠습니다"
+        links2, _ = run_chain(1, *settle(chains[0], links1))
+        self.wait()
+
+        # "지금부터", "검색을", "통해", ...
+        links3, _ = run_chain(2, *settle(chains[1], links2))
+        self.playwl(*[FadeIn(d, shift=RIGHT * 0.1) for d in tail], lag_ratio=0.4)
+
+        # many possibilities
+        others_tree = ghost_tree(nodes2[3], 190, length=0.7, spread=25)
+        self.play(
+            *settle(chains[2], links3),
+            tail.animate.set_color(GREY_B),
+            jg.animate.lit(WHITE),
+            chosen1.animate.set_stroke(WHITE),
+            frame_to(root, jg, *chains, tail, others_tree, margin=1.2),
+            run_time=1.5,
+        )
+        self.playw(grow_tree(others_tree, run_time=2))
+
+        # randomness at every word -> always a different output:
+        # walk one sentence to its end, then the next, each in its own colour
+        chain_colors = [YELLOW, RED_B, GREEN_B]
+        for row, links, c in zip(chains, [links1, links2, links3], chain_colors):
+            steps = [
+                AnimationGroup(link.animate.set_stroke(c), n.animate.lit(c))
+                for link, n in zip(links, row)
+            ]
+            if row is chains[2]:
+                steps.append(tail.animate.set_color(c))
+            self.playw(
+                LaggedStart(*steps, lag_ratio=0.7),
+                run_time=0.35 * len(steps) + 0.3,
+                wait=0.5,
+            )
+        self.wait()
+
+        # same question, different answers
+        self.playw(
+            root.animate.style(BLUE_A, BLUE_A, 3),
+            FadeOut(others_tree),
+            frame_to(root, jg, *chains, tail, margin=1.25),
+            wait=2,
+        )
