@@ -286,3 +286,11 @@ $ cd src/jev3
 $ uv run manimgl main.py
 ```
 
+## Vision Transformer 1
+Vision Transformer (ViT) architecture
+[[YouTube link]](https://youtu.be/1X6wCQUYhnM) <br />
+```bash
+$ cd src/vit1
+$ uv run manimgl main.py
+```
+
