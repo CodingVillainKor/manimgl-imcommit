@@ -245,3 +245,12 @@ Jev is a multiple choice question-answering LLM framework
 $ cd src/jev1
 $ uv run manimgl main.py
 ```
+
+## Linear attention 3: DeltaNet
+DeltaNet is a neural network architecture based on Linear attention
+[[YouTube link]](https://youtu.be/WXUmWVT_Uog) <br />
+```bash
+$ cd src/linearAttn3
+$ uv run manimgl main.py
+```
+
