@@ -270,3 +270,11 @@ $ cd src/jev2
 $ uv run manimgl main.py
 ```
 
+## LLM sampling 2
+Top-k, Top-p, and temperature sampling in LLMs
+[[YouTube link]](https://youtu.be/XKKwbJbx-88) <br />
+```bash
+$ cd src/lmSampling2
+$ uv run manimgl main.py
+```
+
