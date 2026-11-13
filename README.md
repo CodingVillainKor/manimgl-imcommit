@@ -278,3 +278,11 @@ $ cd src/lmSampling2
 $ uv run manimgl main.py
 ```
 
+## Jev 3
+Is Jev BERT?
+[[YouTube link]](https://youtu.be/d5G76L4uhfo) <br />
+```bash
+$ cd src/jev3
+$ uv run manimgl main.py
+```
+
