@@ -294,3 +294,11 @@ $ cd src/vit1
 $ uv run manimgl main.py
 ```
 
+## Jev 4
+Jev is based on Paged attention mechanism
+[[YouTube link]](https://youtu.be/Gj-_LnOEmng) <br />
+```bash
+$ cd src/jev4
+$ uv run manimgl main.py
+```
+
