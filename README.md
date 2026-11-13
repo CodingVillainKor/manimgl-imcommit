@@ -254,3 +254,11 @@ $ cd src/linearAttn3
 $ uv run manimgl main.py
 ```
 
+## LLM sampling 1
+Why LLM speaks differently for every time
+[[YouTube link]](https://youtu.be/cTeOeW-YKd8) <br />
+```bash
+$ cd src/lmSampling1
+$ uv run manimgl main.py
+```
+
