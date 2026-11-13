@@ -262,3 +262,11 @@ $ cd src/lmSampling1
 $ uv run manimgl main.py
 ```
 
+## Jev 2
+Jev 2: noul and score
+[[YouTube link]](https://youtu.be/RX773uJAIOw) <br />
+```bash
+$ cd src/jev2
+$ uv run manimgl main.py
+```
+
